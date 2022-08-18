@@ -1,7 +1,9 @@
 import {
   Component,
   createContext,
+  createEffect,
   createMemo,
+  createRoot,
   createSignal,
   JSX,
   useContext,
@@ -14,8 +16,12 @@ type Route = {
   props?: any;
 };
 
+export const renderRoute = (r: Route) => (
+  <Dynamic component={r.component} {...(r.props ?? {})}></Dynamic>
+);
+
 const DefaultComponent: Component = () => {
-  return <>asd</>;
+  return <></>;
 };
 
 const createRouteContext = () => {
@@ -23,16 +29,12 @@ const createRouteContext = () => {
     [{ name: "", component: DefaultComponent }],
     { equals: false }
   );
-  const name = createMemo(() => routes().at(-1).name);
-  const component = createMemo(() => (
-    <Dynamic
-      component={routes().at(-1).component}
-      {...(routes().at(-1).props ?? {})}
-    ></Dynamic>
-  ));
+  const [current, setCurrent] = createSignal(routes()[0]);
+
   const Push = (r: Route) => {
     updateRoutes((p) => {
       p.push(r);
+      setCurrent(r);
       return p;
     });
   };
@@ -41,20 +43,22 @@ const createRouteContext = () => {
       if (p.length > 1) {
         p.pop();
       }
+      setCurrent(p[-1]);
       return p;
     });
+    setCurrent(routes().at(-1));
   };
   const SetRoot = (r: Route) => {
     updateRoutes((p) => {
-      return [p[0], r];
+      setCurrent(r);
+      return [r];
     });
   };
 
-  return { routes, name, component, SetRoot, Push, Pop } as const;
+  return { routes, current, SetRoot, Push, Pop } as const;
 };
-const RouteContext = createContext<ReturnType<typeof createRouteContext>>(
-  createRouteContext()
-);
+
+const RouteContext = createContext(createRouteContext());
 
 export function RouteProvider({
   children,
