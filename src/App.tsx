@@ -1,4 +1,4 @@
-import { Component, onCleanup, onMount } from "solid-js";
+import { Component, For, onCleanup, onMount } from "solid-js";
 import { RouteProvider, useRoute } from "./Route";
 
 const MenuItem: Component<{ name: string; component: Component }> = ({
@@ -50,11 +50,16 @@ const MenuBar: Component = () => {
 };
 
 const Main: Component = () => {
-  const { renderComponent } = useRoute();
+  const { routes, component, name } = useRoute();
   return (
     <div class="flex flex-row flex-grow">
       <MenuBar></MenuBar>
-      {renderComponent()}
+      {name()}
+      {component()}
+
+      <div>
+        <For each={routes()}>{({ name }) => <div>{name}</div>}</For>
+      </div>
     </div>
   );
 };
