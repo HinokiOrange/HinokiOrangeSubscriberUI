@@ -117,7 +117,7 @@ const NovelItem: Component<{ name: string }> = ({ name }) => {
   });
   return (
     <>
-      <div>
+      <div class="h-full overflow-y-scroll">
         <For each={Object.entries(chapters())} fallback={<div>Loading...</div>}>
           {([_, { Name }]) => <div>{Name}</div>}
         </For>
