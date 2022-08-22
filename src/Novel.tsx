@@ -7,121 +7,65 @@ import {
   onMount,
 } from "solid-js";
 import { Fetch } from ".";
-import { useRoute } from "./Route";
+import { Table, TableCell, TableRow } from "./Table";
 
-// list
-export const Novel: Component = () => {
-  const [list, setList] = createSignal<
-    {
+const NovelTableFields = ["Name", "URL", "IsFinished", "LastUpdated"];
+
+export const NovelEntry: Component<{ id: string }> = ({ id }) => {
+  const [entry, setEntry] = createSignal<{
+    Latest: number;
+    Data: {
       Name: string;
       URL: string;
       IsFinished: boolean;
-    }[]
-  >([], { equals: false });
-  const { Push } = useRoute();
-  createEffect(() => {
-    console.log(list());
-  });
-  onMount(() => {
-    Fetch("/novel")
-      .then((r) => r.json())
-      .then((j) => setList(j));
-  });
+    };
+  }>(
+    { Latest: 0, Data: { Name: "", URL: "", IsFinished: false } },
+    { equals: false }
+  );
 
+  onMount(() => {
+    Fetch(`/module/NovelDownloader/${id}`)
+      .then((r) => r.json())
+      .then((j) => setEntry(j));
+  });
   return (
-    <div>
-      <table class="min-w-full">
-        <thead class="border-b">
-          <tr>
-            <th
-              scope="col"
-              class="text-sm font-medium text-gray-900 px-6 py-4 text-left"
-            >
-              Name
-            </th>
-            <th
-              scope="col"
-              class="text-sm font-medium text-gray-900 px-6 py-4 text-left"
-            >
-              URL
-            </th>
-            <th
-              scope="col"
-              class="text-sm font-medium text-gray-900 px-6 py-4 text-left"
-            >
-              IsFinished
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <For each={list()} fallback={<div>Loading...</div>}>
-            {({ Name, URL, IsFinished }) => (
-              <tr
-                class="border-b hover:bg-gray-100"
-                onclick={() =>
-                  Push({
-                    name: Name,
-                    component: NovelItem,
-                    props: { name: Name },
-                  })
-                }
-              >
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {Name}
-                </td>
-                <td class="text-sm text-gray-900 font-light px-6 py-4 whitespace-nowrap">
-                  <a href={URL} target="_blank">
-                    {URL}
-                  </a>
-                </td>
-                <td class="text-sm text-gray-900 font-light px-6 py-4 whitespace-nowrap">
-                  <input
-                    type="checkbox"
-                    class="pointer-events-none"
-                    checked={IsFinished}
-                  ></input>
-                </td>
-              </tr>
-            )}
-          </For>
-        </tbody>
-      </table>
-    </div>
+    <TableRow>
+      <TableCell>
+        <>{entry().Data.Name}</>
+      </TableCell>
+      <TableCell>
+        <a href={entry().Data.URL} target="_blank">
+          {entry().Data.URL}
+        </a>
+      </TableCell>
+      <TableCell>
+        <input
+          type="checkbox"
+          checked={entry().Data.IsFinished}
+          class="pointer-events-none"
+        ></input>
+      </TableCell>
+      <TableCell>
+        <> {new Date(entry().Latest * 1000).toLocaleString("en-US")}</>
+      </TableCell>
+    </TableRow>
   );
 };
 
-const NovelItem: Component<{ name: string }> = ({ name }) => {
-  const [detail, setDetail] = createSignal<{
-    Name: string;
-    URL: string;
-    IsFinished: boolean;
-    Interval: number;
-    Chapters: {
-      [id: string]: {
-        Name: string;
-        URL: string;
-        ID: string;
-        IsCached: boolean;
-        IsWritten: boolean;
-      };
-    };
-  }>(
-    { Name: "", URL: "", IsFinished: false, Interval: 0, Chapters: {} },
-    { equals: false }
-  );
-  const chapters = createMemo(() => detail().Chapters ?? {});
+// list
+export const Novel: Component = () => {
+  const [list, setList] = createSignal<Array<string>>([], { equals: false });
   onMount(() => {
-    Fetch(`/novel/${name}`)
+    Fetch("/module/NovelDownloader")
       .then((r) => r.json())
-      .then((j) => setDetail(j));
+      .then((j) => Object.keys(j))
+      .then((arr) => setList(arr));
   });
+
   return (
-    <>
-      <div class="h-full overflow-y-scroll">
-        <For each={Object.entries(chapters())} fallback={<div>Loading...</div>}>
-          {([_, { Name }]) => <div>{Name}</div>}
-        </For>
-      </div>
-    </>
+    <Table fields={NovelTableFields}>
+      <For each={list()}>{(id) => <NovelEntry id={id}></NovelEntry>}</For>
+    </Table>
   );
 };
