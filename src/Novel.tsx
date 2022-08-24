@@ -1,17 +1,11 @@
-import {
-  Component,
-  createEffect,
-  createMemo,
-  createSignal,
-  For,
-  onMount,
-} from "solid-js";
+import { Component, createSignal, For, onMount } from "solid-js";
 import { Fetch } from ".";
+import { useRoute } from "./Route";
 import { Table, TableCell, TableRow } from "./Table";
 
 const NovelTableFields = ["Name", "URL", "IsFinished", "LastUpdated"];
 
-export const NovelEntry: Component<{ id: string }> = ({ id }) => {
+const NovelEntry: Component<{ id: string }> = ({ id }) => {
   const [entry, setEntry] = createSignal<{
     Latest: number;
     Data: {
@@ -24,13 +18,19 @@ export const NovelEntry: Component<{ id: string }> = ({ id }) => {
     { equals: false }
   );
 
+  const { Push } = useRoute();
+
   onMount(() => {
     Fetch(`/module/NovelDownloader/${id}`)
       .then((r) => r.json())
       .then((j) => setEntry(j));
   });
   return (
-    <TableRow>
+    <TableRow
+      onClick={() =>
+        Push({ name: entry().Data.Name, component: Novel, props: { id: id } })
+      }
+    >
       <TableCell>
         <>{entry().Data.Name}</>
       </TableCell>
@@ -54,7 +54,7 @@ export const NovelEntry: Component<{ id: string }> = ({ id }) => {
 };
 
 // list
-export const Novel: Component = () => {
+export const NovelList: Component = () => {
   const [list, setList] = createSignal<Array<string>>([], { equals: false });
   onMount(() => {
     Fetch("/module/NovelDownloader")
@@ -67,5 +67,60 @@ export const Novel: Component = () => {
     <Table fields={NovelTableFields}>
       <For each={list()}>{(id) => <NovelEntry id={id}></NovelEntry>}</For>
     </Table>
+  );
+};
+
+type Chapter = {
+  Chapter: {
+    Name: string;
+    URL: string;
+    ID: string;
+  };
+  IsCached: boolean;
+  IsWritten: boolean;
+};
+
+const Novel: Component<{ id: string }> = ({ id }) => {
+  const fields = ["Name", "URL", "ID", "IsCached", "IsWritten"];
+  const [chapters, setChapters] = createSignal<{
+    Chapters: {
+      [key: string]: Chapter;
+    };
+    IsNeedUpdate: boolean;
+  }>({ Chapters: {}, IsNeedUpdate: false }, { equals: false });
+
+  onMount(() => {
+    Fetch(`/module/NovelDownloader/${id}/detail`)
+      .then((r) => r.json())
+      .then((j) => setChapters(j));
+  });
+  return (
+    <Table fields={fields}>
+      <For each={Object.values(chapters().Chapters)}>
+        {(ch) => <Chapter chapter={ch}></Chapter>}
+      </For>
+    </Table>
+  );
+};
+
+const Chapter: Component<{ chapter: Chapter }> = ({ chapter }) => {
+  return (
+    <TableRow>
+      <TableCell>
+        <>{chapter.Chapter.Name}</>
+      </TableCell>
+      <TableCell>
+        <>{chapter.Chapter.URL}</>
+      </TableCell>
+      <TableCell>
+        <>{chapter.Chapter.ID}</>
+      </TableCell>
+      <TableCell>
+        <>{chapter.IsCached}</>
+      </TableCell>
+      <TableCell>
+        <>{chapter.IsWritten}</>
+      </TableCell>
+    </TableRow>
   );
 };

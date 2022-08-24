@@ -1,3 +1,30 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+#ho-main {
+  grid-template-rows:
+    [breadcrumb logo] 80px [nav-start content] calc(100vh - 80px)
+    [nav-end];
+  grid-template-columns: [nav logo] min-content [breadcrumb content] 1fr [cmd] min-content;
+}
+
+#ho-nav {
+  grid-row: nav-start / nav-end;
+  grid-column: nav;
+}
+
+#ho-breadcrumb {
+  grid-row: breadcrumb;
+  grid-column: breadcrumb;
+}
+
+#ho-content {
+  grid-row: content;
+  grid-column: content;
+}
+
+#ho-logo {
+  grid-row: 1;
+  grid-column: 1;
+}
