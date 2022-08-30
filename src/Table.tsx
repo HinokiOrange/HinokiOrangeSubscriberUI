@@ -1,5 +1,4 @@
 import {
-  children,
   createContext,
   createEffect,
   createSignal,
@@ -12,7 +11,7 @@ import {
 } from "solid-js";
 import { FocusContextConstructor, FocusContext, useFocus } from "./Misc";
 
-const createTableRowContext = () => {
+const createTableRowContext = (clickHandler?: () => void) => {
   const [clicks, setClicks] = createSignal(0);
   const [cellPool, updateCellPool] = createSignal(0);
 
@@ -25,7 +24,7 @@ const createTableRowContext = () => {
   const click = () => setClicks(clicks() + 1);
   const isClick = () => clicks() > 0;
 
-  return { getCellId, click, isClick } as const;
+  return { getCellId, clickHandler: clickHandler ?? (() => {}) } as const;
 };
 const TableRowContext = createContext(createTableRowContext());
 const useTableRow = () => useContext(TableRowContext);
@@ -107,28 +106,18 @@ const useTable = () => useContext(TableContext);
 export const TableRow: ParentComponent<{
   onClick?: () => void;
 }> = (props) => {
-  const clickHandler = props.onClick ?? (() => {});
   const { getRowId, selectedRow, setFocusedRow, focusedRow } = useTable();
   const id = getRowId();
-  const rowContext = createTableRowContext();
+  const rowContext = createTableRowContext(props.onClick);
   const focusContext = FocusContextConstructor();
   createEffect(() => {
-    rowContext.isClick() && clickHandler();
-  });
-  createEffect(() => {
-    selectedRow() == id && clickHandler();
+    selectedRow() == id && rowContext.clickHandler();
   });
   createEffect(() => {
     focusContext.isFocused() && setFocusedRow(id);
   });
   createEffect(() => {
     focusContext.setFocus(focusedRow() == id);
-  });
-  onCleanup(() => {
-    console.log(`leave ${id}`);
-  });
-  onMount(() => {
-    console.log(`enter ${id}`);
   });
 
   return (
@@ -142,12 +131,11 @@ export const TableRow: ParentComponent<{
 export const TableCell: ParentComponent<{
   align?: "center" | "left" | "right";
 }> = (props) => {
-  const { click, getCellId } = useTableRow();
+  const { clickHandler, getCellId } = useTableRow();
   const id = getCellId();
   const align = props.align ?? "center";
   let elem: HTMLDivElement;
   const { setFocus, isFocused, isScrolled } = useFocus();
-
   if (id == 0) {
     createEffect(() => {
       isFocused() && isScrolled() && elem.scrollIntoView({ block: "center" });
@@ -165,7 +153,7 @@ export const TableCell: ParentComponent<{
         "text-right flex items-end justify-end": align == "right",
       }}
       onmousemove={() => setFocus(true, true)}
-      onClick={() => click()}
+      onClick={clickHandler}
     >
       {props.children}
     </div>
