@@ -1,11 +1,8 @@
 import {
   Component,
   createContext,
-  createEffect,
-  createMemo,
-  createRoot,
   createSignal,
-  JSX,
+  ParentComponent,
   useContext,
 } from "solid-js";
 import { Dynamic } from "solid-js/web";
@@ -43,7 +40,6 @@ const createRouteContext = () => {
       if (p.length > 1) {
         p.pop();
       }
-      setCurrent(p[-1]);
       return p;
     });
     setCurrent(routes().at(-1));
@@ -54,21 +50,25 @@ const createRouteContext = () => {
       return [r];
     });
   };
+  const Jump = (i: number) => {
+    updateRoutes((p) => {
+      return p.slice(0, i + 1);
+    });
+    setCurrent(routes().at(-1));
+  };
 
-  return { routes, current, SetRoot, Push, Pop } as const;
+  return { routes, current, SetRoot, Push, Pop, Jump } as const;
 };
 
 const RouteContext = createContext(createRouteContext());
 
-export function RouteProvider({
-  children,
-}: {
-  children: JSX.Element;
-}): JSX.Element {
+export const RouteProvider: ParentComponent = (props) => {
   return (
-    <RouteContext.Provider value={useRoute()}>{children}</RouteContext.Provider>
+    <RouteContext.Provider value={useRoute()}>
+      {props.children}
+    </RouteContext.Provider>
   );
-}
+};
 
 export function useRoute() {
   return useContext(RouteContext);

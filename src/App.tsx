@@ -4,17 +4,22 @@ import {
   createRoot,
   createSignal,
   For,
+  Match,
   onMount,
+  Show,
+  Switch,
 } from "solid-js";
 import { NovelList } from "./Novel";
 import { renderRoute, RouteProvider, useRoute } from "./Route";
-import { Test } from "./Test";
+import { OcThreebars2 } from "solid-icons/oc";
+import {
+  IoCaretForwardOutline,
+  IoChevronBackOutline,
+  IoMenuOutline,
+} from "solid-icons/io";
 
 const navRoot = createRoot(() => {
-  const list = [
-    // { name: "Test", component: Test },
-    { name: "Novel", component: NovelList },
-  ];
+  const list = [{ name: "Novel", component: NovelList }];
 
   const [index, setIndex] = createSignal(-1);
   const { SetRoot } = useRoute();
@@ -36,11 +41,11 @@ const NavItem: Component<{
   return (
     <li class="relative">
       <a
-        class="flex items-center text-sm py-4 px-6 h-12 overflow-hidden text-ellipsis whitespace-nowrap rounded "
+        class="flex items-center text-sm py-4 px-6 h-12 overflow-hidden text-ellipsis whitespace-nowrap rounded"
         classList={{
-          "bg-white text-orange-700 pointer-events-none":
+          "pointer-events-none bg-secondary text-secondary-text font-bold text-lg":
             index == selectedIndex(),
-          "hover:bg-orange-300 hover:font-bold hover:text-black":
+          "hover:bg-primary-light hover:font-bold hover:text-primary-text":
             index != selectedIndex(),
         }}
         data-mdb-ripple="true"
@@ -58,45 +63,79 @@ const NavItem: Component<{
 
 const Nav: Component = () => {
   const { list } = navRoot;
+  const [display, setDisplay] = createSignal(false);
   return (
-    <div class="h-full sticky top-0 left-0 bg-third text-white p-2">
-      <ul class="relative">
-        <For each={list}>
-          {(item, i) => (
-            <NavItem
-              name={item.name}
-              component={item.component}
-              index={i()}
-            ></NavItem>
-          )}
-        </For>
-      </ul>
-    </div>
+    <Show
+      when={display()}
+      fallback={
+        <IoMenuOutline
+          class="w-6 h-6"
+          onclick={() => setDisplay(true)}
+        ></IoMenuOutline>
+      }
+    >
+      <div
+        onclick={() => setDisplay(false)}
+        class="absolute top-0 left-0 h-screen w-screen z-10 bg-black bg-opacity-80"
+      >
+        <div class="h-full w-min p-2 bg-primary pointer-events-none bg-opacity-100">
+          <ul class="relative">
+            <div class="flex text-center items-center text-3xl p-3 font-extrabold text-primary-text rounded">
+              HoSub
+            </div>
+            <For each={list}>
+              {(item, i) => (
+                <NavItem
+                  name={item.name}
+                  component={item.component}
+                  index={i()}
+                ></NavItem>
+              )}
+            </For>
+          </ul>
+        </div>
+      </div>
+    </Show>
   );
 };
 
 const Breadcrumb: Component = () => {
-  const { routes, current } = useRoute();
+  const { routes, current, Pop, Jump } = useRoute();
 
   return (
     <div class="p-2 h-full flex items-center">
-      <nav class=" text-gray-700 text-sm  w-full h-full">
-        <ol class="list-reset flex py-2 h-full">
+      <nav class="text-sm w-full h-full">
+        <ol class="list-reset flex h-full text-secondary-light">
+          <li class="h-full mx-2 px-4 flex items-center">
+            <Nav></Nav>
+          </li>
+          <li class="mx-2 px-4 flex items-center">
+            <IoChevronBackOutline
+              class="w-6 h-6"
+              onclick={() => Pop()}
+              classList={{
+                " invisible pointer-events-none": routes().length == 1,
+              }}
+            ></IoChevronBackOutline>
+          </li>
           <For each={routes()}>
             {({ name }, i) => (
               <>
                 <li
-                  class="h-full px-6 flex items-center"
+                  class="h-full mx-2 px-4 flex items-center text-gray-300"
                   classList={{
-                    "bg-primary text-third text-xl font-bold rounded":
+                    "text-lg font-bold rounded !text-primary-text pointer-events-none":
                       current().name == name,
                   }}
+                  onclick={() => Jump(i())}
                 >
                   {name}
                 </li>
-                <span class="text-gray-500 mx-2 py-4 px-6">
-                  {i() < routes().length - 1 ? "/" : ""}
-                </span>
+                <li class="text-primary-light mx-2 px-4 flex items-center">
+                  <Show when={i() < routes().length - 1}>
+                    <IoCaretForwardOutline class="w-6 h-6"></IoCaretForwardOutline>
+                  </Show>
+                </li>
               </>
             )}
           </For>
@@ -110,24 +149,29 @@ const Main: Component = () => {
   const { setIndex } = navRoot;
   onMount(() => setIndex(0));
 
-  const { current } = useRoute();
+  const { current, Pop } = useRoute();
   createEffect(() => {
     document.title = current().name;
   });
+
+  const keyHandler = (k: KeyboardEvent) => {
+    switch (k.key) {
+      case "Backspace":
+        Pop();
+        break;
+    }
+  };
+
+  onMount(() => {
+    window.addEventListener("keydown", keyHandler);
+  });
+
   return (
-    <div id="ho-main" class="w-full h-full grid bg-third">
-      <div id="ho-logo" class="p-2">
-        <div class="flex text-center items-center text-3xl p-3 bg-second font-extrabold text-third rounded">
-          HoSub
-        </div>
-      </div>
-      <div id="ho-nav" class="h-full">
-        <Nav></Nav>
-      </div>
+    <div id="ho-main" class="w-full h-full grid bg-primary">
       <div id="ho-breadcrumb">
         <Breadcrumb></Breadcrumb>
       </div>
-      <div id="ho-content" class="h-full w-full">
+      <div id="ho-content" class="h-full w-full bg-gray-100 rounded">
         {renderRoute(current())}
       </div>
     </div>

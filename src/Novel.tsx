@@ -1,7 +1,8 @@
-import { Component, createSignal, For, onMount } from "solid-js";
+import { Component, createEffect, createSignal, For, onMount } from "solid-js";
 import { Fetch } from ".";
+import { Checker, Linker } from "./Misc";
 import { useRoute } from "./Route";
-import { Table, TableCell, TableRow } from "./Table";
+import { Table, TableCell, TableCollapse, TableRow } from "./Table";
 
 const NovelTableFields = ["Name", "URL", "IsFinished", "LastUpdated"];
 
@@ -31,20 +32,14 @@ const NovelEntry: Component<{ id: string }> = ({ id }) => {
         Push({ name: entry().Data.Name, component: Novel, props: { id: id } })
       }
     >
-      <TableCell>
+      <TableCell align="left">
         <>{entry().Data.Name}</>
       </TableCell>
-      <TableCell>
-        <a href={entry().Data.URL} target="_blank">
-          {entry().Data.URL}
-        </a>
+      <TableCell align="left">
+        <Linker url={entry().Data.URL}></Linker>
       </TableCell>
       <TableCell>
-        <input
-          type="checkbox"
-          checked={entry().Data.IsFinished}
-          class="pointer-events-none"
-        ></input>
+        <Checker value={entry().Data.IsFinished}></Checker>
       </TableCell>
       <TableCell>
         <> {new Date(entry().Latest * 1000).toLocaleString("en-US")}</>
@@ -86,18 +81,32 @@ const Novel: Component<{ id: string }> = ({ id }) => {
     Chapters: {
       [key: string]: Chapter;
     };
+    Volumes: Array<{
+      Name: string;
+      ID: string;
+      Chapters: Array<{ Name: string; URL: string; ID: string }>;
+    }>;
     IsNeedUpdate: boolean;
-  }>({ Chapters: {}, IsNeedUpdate: false }, { equals: false });
+  }>({ Chapters: {}, Volumes: [], IsNeedUpdate: false }, { equals: false });
 
   onMount(() => {
     Fetch(`/module/NovelDownloader/${id}/detail`)
       .then((r) => r.json())
       .then((j) => setChapters(j));
   });
+
   return (
     <Table fields={fields}>
-      <For each={Object.values(chapters().Chapters)}>
-        {(ch) => <Chapter chapter={ch}></Chapter>}
+      <For each={chapters().Volumes}>
+        {({ Name, ID, Chapters }, i) => (
+          <TableCollapse text={Name == "*" ? `Volume: ${ID}` : Name}>
+            <For each={Chapters}>
+              {({ ID }) => (
+                <Chapter chapter={chapters().Chapters[ID]}></Chapter>
+              )}
+            </For>
+          </TableCollapse>
+        )}
       </For>
     </Table>
   );
@@ -106,20 +115,20 @@ const Novel: Component<{ id: string }> = ({ id }) => {
 const Chapter: Component<{ chapter: Chapter }> = ({ chapter }) => {
   return (
     <TableRow>
-      <TableCell>
+      <TableCell align="left">
         <>{chapter.Chapter.Name}</>
       </TableCell>
-      <TableCell>
-        <>{chapter.Chapter.URL}</>
+      <TableCell align="left">
+        <Linker url={chapter.Chapter.URL}></Linker>
       </TableCell>
       <TableCell>
         <>{chapter.Chapter.ID}</>
       </TableCell>
       <TableCell>
-        <>{chapter.IsCached}</>
+        <Checker value={chapter.IsCached}></Checker>
       </TableCell>
       <TableCell>
-        <>{chapter.IsWritten}</>
+        <Checker value={chapter.IsWritten}></Checker>
       </TableCell>
     </TableRow>
   );

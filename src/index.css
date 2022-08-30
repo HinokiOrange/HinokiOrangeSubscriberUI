@@ -3,15 +3,8 @@
 @tailwind utilities;
 
 #ho-main {
-  grid-template-rows:
-    [breadcrumb logo] 80px [nav-start content] calc(100vh - 80px)
-    [nav-end];
-  grid-template-columns: [nav logo] min-content [breadcrumb content] 1fr [cmd] min-content;
-}
-
-#ho-nav {
-  grid-row: nav-start / nav-end;
-  grid-column: nav;
+  grid-template-rows: [breadcrumb] 36px [content] calc(100vh - 36px);
+  grid-template-columns: [breadcrumb content] 1fr [cmd] min-content;
 }
 
 #ho-breadcrumb {
@@ -27,4 +20,13 @@
 #ho-logo {
   grid-row: 1;
   grid-column: 1;
+}
+
+.ho-table-content::-webkit-scrollbar {
+  display: none;
+}
+
+.ho-table-content {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
