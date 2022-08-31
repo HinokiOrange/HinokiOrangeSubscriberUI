@@ -1,128 +1,88 @@
 import {
   createContext,
   createEffect,
+  createMemo,
   createSignal,
   For,
+  on,
   onCleanup,
   onMount,
   ParentComponent,
   Show,
   useContext,
 } from "solid-js";
-import { FocusContextConstructor, FocusContext, useFocus } from "./Misc";
+import {
+  createFocusContext,
+  FocusContext,
+  useFocus,
+  createIdPool,
+  createFocusedId,
+} from "./Misc";
 
-const createTableRowContext = (clickHandler?: () => void) => {
-  const [clicks, setClicks] = createSignal(0);
-  const [cellPool, updateCellPool] = createSignal(0);
+const createTableRowContext = (rowId: number, clickHandler?: () => void) => {
+  const { getId: getCellId } = createIdPool();
 
-  const getCellId = () => {
-    const i = cellPool();
-    updateCellPool(i + 1);
-    return i;
-  };
+  return {
+    rowId,
 
-  const click = () => setClicks(clicks() + 1);
-  const isClick = () => clicks() > 0;
+    getCellId,
 
-  return { getCellId, clickHandler: clickHandler ?? (() => {}) } as const;
+    clickHandler: clickHandler ?? (() => {}),
+  } as const;
 };
-const TableRowContext = createContext(createTableRowContext());
+const TableRowContext = createContext(createTableRowContext(-1));
 const useTableRow = () => useContext(TableRowContext);
 
-const TableContextConstructor = (fieldLength: number) => {
-  const [expand, setExpand] = createSignal(0);
+const createTableContext = (fieldLength: number) => {
+  const rowPool = createIdPool();
+  const focusedRow = createFocusedId(rowPool.size);
+  const [getEnteredRowId, setEnteredRowId] = createSignal(-1, {
+    equals: false,
+  });
 
-  const [collapsePool, updateCollapsePool] = createSignal(0);
-
-  const [rowPool, updateRowPoll] = createSignal(0);
-  const [focusedRow, setFocusedRow] = createSignal(0);
-  const [selectedRow, setSelectedRow] = createSignal(-1);
-
-  const getCollapseId = () => {
-    const i = collapsePool();
-    updateCollapsePool(i + 1);
-    return i;
-  };
-
-  const getRowId = () => {
-    const i = rowPool();
-    updateRowPoll(i + 1);
-    return i;
-  };
-
-  const prevRow = () => {
-    if (focusedRow() == 0) {
-      return;
-    }
-    setFocusedRow(focusedRow() - 1);
-  };
-
-  const nextRow = () => {
-    if (focusedRow() >= rowPool() - 1) {
-      return;
-    }
-    setFocusedRow(focusedRow() + 1);
-  };
-
-  const selectRow = () => {
-    setSelectedRow(focusedRow());
-  };
-
-  const nextExpand = () => {
-    if (expand() >= collapsePool() - 1) {
-      return;
-    }
-    setExpand(expand() + 1);
-  };
-
-  const prevExpand = () => {
-    if (expand() == 0) {
-      return;
-    }
-    setExpand(expand() - 1);
-  };
+  const collapsePool = createIdPool();
+  const focusedCollapse = createFocusedId(collapsePool.size, {
+    onSet() {
+      // clean row to re-create rows in new collapse
+      rowPool.clean();
+      focusedRow.set(0, true);
+    },
+  });
 
   return {
     fieldLength,
 
-    getCollapseId,
-    nextExpand,
-    prevExpand,
-    expand,
-    setExpand,
-
-    getRowId,
-    setFocusedRow,
+    rowPool,
     focusedRow,
-    prevRow,
-    nextRow,
-    selectedRow,
-    selectRow,
+    getEnteredRowId,
+    enterRow() {
+      setEnteredRowId(focusedRow.get());
+    },
+
+    collapsePool,
+    focusedCollapse,
   } as const;
 };
-const TableContext = createContext(TableContextConstructor(0));
+const TableContext = createContext(createTableContext(0));
 const useTable = () => useContext(TableContext);
 
 export const TableRow: ParentComponent<{
   onClick?: () => void;
 }> = (props) => {
-  const { getRowId, selectedRow, setFocusedRow, focusedRow } = useTable();
-  const id = getRowId();
-  const rowContext = createTableRowContext(props.onClick);
-  const focusContext = FocusContextConstructor();
+  const tableCtx = useTable();
+  const rowCtx = createTableRowContext(tableCtx.rowPool.getId(), props.onClick);
+  const focusCtx = createFocusContext();
   createEffect(() => {
-    selectedRow() == id && rowContext.clickHandler();
+    focusCtx.setFocus(tableCtx.focusedRow.get() == rowCtx.rowId);
   });
+
   createEffect(() => {
-    focusContext.isFocused() && setFocusedRow(id);
-  });
-  createEffect(() => {
-    focusContext.setFocus(focusedRow() == id);
+    tableCtx.getEnteredRowId() == rowCtx.rowId && rowCtx.clickHandler();
   });
 
   return (
-    <TableRowContext.Provider value={rowContext}>
-      <FocusContext.Provider value={focusContext}>
+    <TableRowContext.Provider value={rowCtx}>
+      <FocusContext.Provider value={focusCtx}>
         {props.children}
       </FocusContext.Provider>
     </TableRowContext.Provider>
@@ -131,14 +91,19 @@ export const TableRow: ParentComponent<{
 export const TableCell: ParentComponent<{
   align?: "center" | "left" | "right";
 }> = (props) => {
-  const { clickHandler, getCellId } = useTableRow();
-  const id = getCellId();
   const align = props.align ?? "center";
   let elem: HTMLDivElement;
-  const { setFocus, isFocused, isScrolled } = useFocus();
-  if (id == 0) {
+
+  const tableCtx = useTable();
+  const rowCtx = useTableRow();
+  const focusCtx = useFocus();
+  const cellId = rowCtx.getCellId();
+
+  if (cellId == 0) {
     createEffect(() => {
-      isFocused() && isScrolled() && elem.scrollIntoView({ block: "center" });
+      focusCtx.isFocused() &&
+        tableCtx.focusedRow.needScroll() &&
+        elem.scrollIntoView({ block: "center" });
     });
   }
 
@@ -147,13 +112,13 @@ export const TableCell: ParentComponent<{
       ref={elem}
       class="px-2"
       classList={{
-        "bg-secondary-dark text-white font-bold py-3": isFocused(),
+        "bg-secondary-dark text-white font-bold py-3": focusCtx.isFocused(),
         "text-center flex items-center justify-center": align == "center",
         "text-left flex items-start justify-start": align == "left",
         "text-right flex items-end justify-end": align == "right",
       }}
-      onmousemove={() => setFocus(true, true)}
-      onClick={clickHandler}
+      onmousemove={() => tableCtx.focusedRow.set(rowCtx.rowId)}
+      onClick={rowCtx.clickHandler}
     >
       {props.children}
     </div>
@@ -163,53 +128,63 @@ export const TableCell: ParentComponent<{
 export const TableCollapse: ParentComponent<{
   text: string;
 }> = (props) => {
-  const { fieldLength, getCollapseId, expand, setExpand } = useTable();
-  const id = getCollapseId();
+  const tableCtx = useTable();
+  const collapseId = tableCtx.collapsePool.getId();
+
+  const isFirst = collapseId == 0;
+  const isFocused = createMemo(
+    () => tableCtx.focusedCollapse.get() == collapseId
+  );
+  const isPrevOfFocused = createMemo(
+    () => collapseId == tableCtx.focusedCollapse.get() - 1
+  );
+  const isNextOfFocused = createMemo(
+    () => collapseId == tableCtx.focusedCollapse.get() + 1
+  );
 
   return (
     <>
       <div
         class="h-8 text-lg bg-primary-light text-primary-text border-b border-primary hover:bg-secondary hover:text-secondary-text "
         style={{
-          "grid-column": `span ${fieldLength}`,
+          "grid-column": `span ${tableCtx.fieldLength}`,
         }}
         classList={{
-          "top-8": expand() == id && id == 0,
-          "top-16": expand() == id && id > 0,
-          "pointer-events-none sticky left-0": expand() == id,
-          "sticky top-8 left-0": id == expand() - 1,
-          "sticky bottom-0 left-0": id == expand() + 1,
+          "top-8": isFocused() && isFirst,
+          "top-16": isFocused() && !isFirst,
+          "pointer-events-none sticky left-0": isFocused(),
+          "sticky top-8 left-0": isPrevOfFocused(),
+          "sticky bottom-0 left-0": isNextOfFocused(),
         }}
-        onclick={() => setExpand(id)}
+        onclick={() => tableCtx.focusedCollapse.set(collapseId)}
       >
         <div class="h-full flex items-center justify-center">{props.text}</div>
       </div>
-      <Show when={expand() == id}>{props.children}</Show>
+      <Show when={isFocused()}>{props.children}</Show>
     </>
   );
 };
 
 export const Table: ParentComponent<{ fields: Array<string> }> = (props) => {
   const { fields } = props;
-  const context = TableContextConstructor(fields.length);
-  const { nextRow, prevRow, selectRow, nextExpand, prevExpand } = context;
+  const context = createTableContext(fields.length);
 
   const onKey = (k: KeyboardEvent) => {
     switch (k.key) {
       case "ArrowUp":
-        prevRow();
+        context.focusedRow.prev();
         break;
       case "ArrowDown":
-        nextRow();
+        context.focusedRow.next();
         break;
       case "ArrowRight":
-        nextExpand();
+        context.focusedCollapse.next();
         break;
       case "ArrowLeft":
-        prevExpand();
+        context.focusedCollapse.prev();
         break;
       case "Enter":
-        selectRow();
+        context.enterRow();
         break;
     }
   };
@@ -232,8 +207,10 @@ export const Table: ParentComponent<{ fields: Array<string> }> = (props) => {
       >
         <For each={fields}>
           {(Name) => (
-            <div class="text-center h-8 bg-primary-dark text-primary-text sticky top-0 text-xl text-bold">
-              {Name}
+            <div class="text-center h-8 p-0.5 bg-slate-100 rounded text-primary-text sticky top-0 text-xl text-bold">
+              <div class="rounded bg-primary-dark w-full h-full flex items-center justify-center">
+                {Name}
+              </div>
             </div>
           )}
         </For>
